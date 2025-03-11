@@ -303,9 +303,68 @@ export default function NewQuestionPage() {
                 />
               </div>
             </div>
+             {/* Options Block Input */}
+             { questionData.type === "mcq" && (<div className="mt-6 space-y-2">
+                  <Label>Paste Options Block</Label>
+                  <div className="flex space-x-3 ">
 
-            {/* Options Section (only for MCQ) */}
-            {questionData.type === "mcq" && (
+                  <Textarea
+                    rows={6}
+                    placeholder={`(1) $\\frac{125 \\pi}{6}$\n(2) $\\frac{125 \\pi}{24}$\n(3) $\\frac{125 \\pi}{4}$\n(4) $\\frac{125 \\pi}{12}$`}
+                    value={optionsBlock}
+                    onChange={(e) => setOptionsBlock(e.target.value)}
+                    />
+                  <Button onClick={parseOptionsBlock}>Parse Options</Button>
+                    </div>
+                </div>)}
+
+           
+
+            {/* Solution Section */}
+            <div className="mt-6 space-y-4">
+              <h3 className="text-lg font-semibold">Solution</h3>
+              <div>
+                <Label>Answer</Label>
+                <Input
+                  name="answer"
+                  value={questionData.solution.answer}
+                  onChange={(e) => handleInputChange(e, "solution")}
+                />
+              </div>
+              <div>
+                <Label>Explanation</Label>
+                <Textarea
+                  rows={10}
+                  name="explanation"
+                  value={questionData.solution.explanation}
+                  onChange={(e) => handleInputChange(e, "solution")}
+                />
+              </div>
+              <div className="flex items-center">
+                <div className="w-3/4">
+                  <Label>Solution Image URL or Upload Image</Label>
+                  <Input
+                    name="solution_image"
+                    value={questionData.solution.solution_image}
+                    onChange={(e) => handleInputChange(e, "solution")}
+                  />
+                </div>
+                <Button className="ml-4" onClick={() => document.getElementById("solutionImageInput")?.click()}>
+                  Upload
+                </Button>
+                <input
+                  id="solutionImageInput"
+                  type="file"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={(e) => handleImageUpload(e, "solution")}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+         {/* Options Section (only for MCQ) */}
+         {questionData.type === "mcq" && (
               <>
                 <div className="mt-6 space-y-4">
                   <h3 className="text-lg font-semibold">Options</h3>
@@ -383,67 +442,11 @@ export default function NewQuestionPage() {
                     </div>
                   ))}
                 </div>
-                {/* Options Block Input */}
-                <div className="mt-6 space-y-2">
-                  <Label>Paste Options Block</Label>
-                  <div className="flex space-x-3 ">
-
-                  <Textarea
-                    rows={6}
-                    placeholder={`(1) $\\frac{125 \\pi}{6}$\n(2) $\\frac{125 \\pi}{24}$\n(3) $\\frac{125 \\pi}{4}$\n(4) $\\frac{125 \\pi}{12}$`}
-                    value={optionsBlock}
-                    onChange={(e) => setOptionsBlock(e.target.value)}
-                    />
-                  <Button onClick={parseOptionsBlock}>Parse Options</Button>
-                    </div>
-                </div>
+               
               </>
             )}
-
-            {/* Solution Section */}
-            <div className="mt-6 space-y-4">
-              <h3 className="text-lg font-semibold">Solution</h3>
-              <div>
-                <Label>Answer</Label>
-                <Input
-                  name="answer"
-                  value={questionData.solution.answer}
-                  onChange={(e) => handleInputChange(e, "solution")}
-                />
-              </div>
-              <div>
-                <Label>Explanation</Label>
-                <Textarea
-                  rows={10}
-                  name="explanation"
-                  value={questionData.solution.explanation}
-                  onChange={(e) => handleInputChange(e, "solution")}
-                />
-              </div>
-              <div className="flex items-center">
-                <div className="w-3/4">
-                  <Label>Solution Image URL or Upload Image</Label>
-                  <Input
-                    name="solution_image"
-                    value={questionData.solution.solution_image}
-                    onChange={(e) => handleInputChange(e, "solution")}
-                  />
-                </div>
-                <Button className="ml-4" onClick={() => document.getElementById("solutionImageInput")?.click()}>
-                  Upload
-                </Button>
-                <input
-                  id="solutionImageInput"
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={(e) => handleImageUpload(e, "solution")}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
+
 
       {/* Right Side - Preview and Next */}
       <div className="w-1/2 p-4 bg-gray-100 overflow-y-auto">
