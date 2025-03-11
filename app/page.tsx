@@ -41,8 +41,42 @@ const stripOptionPrefix = (text: string) => {
   return text.replace(/^\(\d+\)\s*/, '');
 };
 
+// Helper to strip a leading question number, e.g. "1. " or "23. "
+const stripQuestionNumber = (text: string) => {
+  return text.replace(/^\d+\.\s*/, '');
+};
+
+// Helper to strip "Sol. " from the beginning of the solution explanation.
+const stripSolutionPrefix = (text: string) => {
+  return text.replace(/^Sol\.\s*/, '');
+};
+
 export default function NewQuestionPage() {
   const [questionData, setQuestionData] = useState(initialState);
+  // State for pasted options block.
+  const [optionsBlock, setOptionsBlock] = useState("");
+
+  // Parse the pasted options block into individual option objects.
+  const parseOptionsBlock = () => {
+    const lines = optionsBlock.split("\n").filter((line) => line.trim() !== "");
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+    const parsedOptions = lines.map((line, index) => {
+      // Match pattern like: (1) <option content>
+      const regex = /^\(\d+\)\s*(.*)$/;
+      let match = line.match(regex);
+      let content = match ? match[1].trim() : line.trim();
+      // Check for a Markdown image in the content.
+      const imgRegex = /!\[\]\((.*?)\)/;
+      let option_image = "";
+      const imgMatch = content.match(imgRegex);
+      if (imgMatch && imgMatch[1]) {
+        option_image = imgMatch[1];
+        content = content.replace(imgRegex, "").trim();
+      }
+      return { option_id: letters[index] || `${index + 1}`, content, option_image };
+    });
+    setQuestionData((prev) => ({ ...prev, options: parsedOptions }));
+  };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -50,22 +84,68 @@ export default function NewQuestionPage() {
     index?: number
   ) => {
     let { name, value } = e.target;
-    // If the field is an image field, extract URL if provided in Markdown format.
+    // For image fields, extract URL if in Markdown format.
     if (name.includes("image")) {
       value = extractImageUrl(value);
     }
     if (section === "question") {
+      if (name === "content") {
+        value=value.trim()
+        value = stripQuestionNumber(value);
+      } else {
+        value = value.trim();
+      }
       setQuestionData((prev) => ({ ...prev, [name]: value }));
-    } else if (section === "solution") {
-      setQuestionData((prev) => ({
-        ...prev,
-        solution: { ...prev.solution, [name]: value },
-      }));
-    } else if (section === "option" && index !== undefined) {
+    }  else if (section === "solution") {
+      if (name === "explanation") {
+        // Ensure value is defined
+        const inputValue = value || "";
+        value=value.trim()
+        let newValue = stripSolutionPrefix(inputValue)
+        // Check for a Markdown image in the explanation.
+        const imgRegex = /!\[\]\((.*?)\)/;
+        const imgMatch = newValue.match(imgRegex);
+        if (imgMatch && imgMatch[1]) {
+          const extractedUrl = imgMatch[1];
+          newValue = newValue.replace(imgRegex, "").trim();
+          setQuestionData((prev) => ({
+            ...prev,
+            solution: {
+              ...prev.solution,
+              solution_image: extractedUrl,
+              explanation: newValue,
+            },
+          }));
+          return;
+        }
+        setQuestionData((prev) => ({
+          ...prev,
+          solution: { ...prev.solution, [name]: newValue },
+        }));
+      } else {
+        setQuestionData((prev) => ({
+          ...prev,
+          solution: { ...prev.solution, [name]: (value || "").trim() },
+        }));
+      }
+    }
+     else if (section === "option" && index !== undefined) {
       const newOptions = [...questionData.options];
-      // If the field is "content", strip the prefix (e.g., "(3)")
-      const newValue = name === "content" ? stripOptionPrefix(value) : value;
-      newOptions[index] = { ...newOptions[index], [name]: newValue };
+      if (name === "content") {
+        value=value.trim()
+        let newValue = stripOptionPrefix(value)
+        // Check for a Markdown image in the option content.
+        const imgRegex = /!\[\]\((.*?)\)/;
+        const imgMatch = newValue.match(imgRegex);
+        if (imgMatch && imgMatch[1]) {
+          newOptions[index].option_image = imgMatch[1];
+          newValue = newValue.replace(imgRegex, "").trim();
+        }
+        value = newValue;
+      } else {
+        value = value.trim();
+      }
+      newOptions[index] = { ...newOptions[index], [name]: value };
       setQuestionData((prev) => ({ ...prev, options: newOptions }));
     }
   };
@@ -97,7 +177,7 @@ export default function NewQuestionPage() {
     }
   };
 
-  // Function to double the dollar signs for LaTeX
+  // Function to double the dollar signs for LaTeX.
   const doubleDollarSigns = (latexContent: string) => {
     return latexContent.replace(/\$/g, "$$$$");
   };
@@ -111,8 +191,9 @@ export default function NewQuestionPage() {
       });
       if (response.ok) {
         alert("Data saved successfully!");
-        // Clear inputs by resetting state
-        setQuestionData(initialState);
+        // Reset the form but preserve the subject from the last question.
+        setQuestionData({ ...initialState, subject: questionData.subject });
+        setOptionsBlock("");
       } else {
         alert("Failed to save data.");
       }
@@ -128,73 +209,66 @@ export default function NewQuestionPage() {
       <div className="w-1/2 p-4 overflow-y-auto">
         <Card>
           <CardHeader>
-            <CardTitle>Enter Question Data</CardTitle>
+            <CardTitle className="hidden">Enter Question Data</CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Subject Selector */}
-            <div className="flex space-x-10">
-
-          
-            <div className="flex items-center space-x-2 mb-4">
-              <Label className="mr-2">Subject:</Label>
-              <Button
-                variant={questionData.subject === "Physics" ? "default" : "outline"}
-                onClick={() =>
-                  setQuestionData((prev) => ({ ...prev, subject: "Physics" }))
-                }
-              >
-                Physics
-              </Button>
-              <Button
-                variant={questionData.subject === "Maths" ? "default" : "outline"}
-                onClick={() =>
-                  setQuestionData((prev) => ({ ...prev, subject: "Maths" }))
-                }
-              >
-                Maths
-              </Button>
-              <Button
-                variant={questionData.subject === "Chemistry" ? "default" : "outline"}
-                onClick={() =>
-                  setQuestionData((prev) => ({ ...prev, subject: "Chemistry" }))
-                }
-              >
-                Chemistry
-              </Button>
-            </div>
-
-            {/* Type Selector */}
-            <div className="flex items-center space-x-2 mb-4">
-              <Label className="mr-2">Question Type:</Label>
-              <Button
-                variant={questionData.type === "mcq" ? "default" : "outline"}
-                onClick={() =>
-                  setQuestionData((prev) => ({
-                    ...prev,
-                    type: "mcq",
-                    options:
-                      prev.options.length > 0
-                        ? prev.options
-                        : [
-                            { option_id: "A", content: "", option_image: "" },
-                            { option_id: "B", content: "", option_image: "" },
-                            { option_id: "C", content: "", option_image: "" },
-                            { option_id: "D", content: "", option_image: "" },
-                          ],
-                  }))
-                }
-              >
-                MCQ
-              </Button>
-              <Button
-                variant={questionData.type === "numerical" ? "default" : "outline"}
-                onClick={() =>
-                  setQuestionData((prev) => ({ ...prev, type: "numerical", options: [] }))
-                }
-              >
-                Numerical
-              </Button>
-            </div>
+            {/* Subject & Type Selectors */}
+            <div className="flex space-x-11">
+              <div className="flex items-center space-x-2 mb-4">
+                <Label className="mr-2">Subject:</Label>
+                <Button
+                  variant={questionData.subject === "Physics" ? "default" : "outline"}
+                  onClick={() =>
+                    setQuestionData((prev) => ({ ...prev, subject: "Physics" }))
+                  }
+                >
+                  Physics
+                </Button>
+                <Button
+                  variant={questionData.subject === "Maths" ? "default" : "outline"}
+                  onClick={() =>
+                    setQuestionData((prev) => ({ ...prev, subject: "Maths" }))
+                  }
+                >
+                  Maths
+                </Button>
+                <Button
+                  variant={questionData.subject === "Chemistry" ? "default" : "outline"}
+                  onClick={() =>
+                    setQuestionData((prev) => ({ ...prev, subject: "Chemistry" }))
+                  }
+                >
+                  Chemistry
+                </Button>
+              </div>
+              <div className="flex items-center space-x-2 mb-4">
+                <Label className="mr-2">Question Type:</Label>
+                <Button
+                  variant={questionData.type === "mcq" ? "default" : "outline"}
+                  onClick={() =>
+                    setQuestionData((prev) => ({
+                      ...prev,
+                      type: "mcq",
+                      options: prev.options.length > 0 ? prev.options : [
+                        { option_id: "A", content: "", option_image: "" },
+                        { option_id: "B", content: "", option_image: "" },
+                        { option_id: "C", content: "", option_image: "" },
+                        { option_id: "D", content: "", option_image: "" },
+                      ],
+                    }))
+                  }
+                >
+                  MCQ
+                </Button>
+                <Button
+                  variant={questionData.type === "numerical" ? "default" : "outline"}
+                  onClick={() =>
+                    setQuestionData((prev) => ({ ...prev, type: "numerical", options: [] }))
+                  }
+                >
+                  Numerical
+                </Button>
+              </div>
             </div>
 
             {/* Question Section */}
@@ -217,12 +291,7 @@ export default function NewQuestionPage() {
                     onChange={(e) => handleInputChange(e, "question")}
                   />
                 </div>
-                <Button
-                  className="ml-4"
-                  onClick={() =>
-                    document.getElementById("questionImageInput")?.click()
-                  }
-                >
+                <Button className="ml-4" onClick={() => document.getElementById("questionImageInput")?.click()}>
                   Upload
                 </Button>
                 <input
@@ -237,47 +306,98 @@ export default function NewQuestionPage() {
 
             {/* Options Section (only for MCQ) */}
             {questionData.type === "mcq" && (
-              <div className="mt-6 space-y-4">
-                <h3 className="text-lg font-semibold">Options</h3>
-                {questionData.options.map((option, index) => (
-                  <div key={index} className="border p-4 rounded">
-                    <div>
-                      <Label>Option Content (LaTeX supported)</Label>
-                      <Input
-                        name="content"
-                        value={option.content}
-                        onChange={(e) => handleInputChange(e, "option", index)}
-                      />
-                    </div>
-                    <div className="flex items-center">
-                      <div className="w-3/4">
-                        <Label>Option Image URL or Upload Image</Label>
-                        <Input
-                          name="option_image"
-                          value={option.option_image}
-                          onChange={(e) => handleInputChange(e, "option", index)}
-                        />
+              <>
+                <div className="mt-6 space-y-4">
+                  <h3 className="text-lg font-semibold">Options</h3>
+                  {/* Group options in pairs */}
+                  {[0, 2].map((i) => (
+                    <div key={i} className="space-y-2 border p-4 rounded">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>
+                            Option {questionData.options[i].option_id} Content (LaTeX supported)
+                          </Label>
+                          <Input
+                            name="content"
+                            value={questionData.options[i].content}
+                            onChange={(e) => handleInputChange(e, "option", i)}
+                          />
+                        </div>
+                        <div>
+                          <Label>
+                            Option {questionData.options[i + 1].option_id} Content (LaTeX supported)
+                          </Label>
+                          <Input
+                            name="content"
+                            value={questionData.options[i + 1].content}
+                            onChange={(e) => handleInputChange(e, "option", i + 1)}
+                          />
+                        </div>
                       </div>
-                      <Button
-                        className="ml-4"
-                        onClick={() =>
-                          document.getElementById(`optionImageInput${index}`)?.click()
-                        }
-                      >
-                        Upload
-                      </Button>
-                      <input
-                        id={`optionImageInput${index}`}
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        onChange={(e) => handleImageUpload(e, "option", index)}
-                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>
+                            Option {questionData.options[i].option_id} Image URL or Upload Image
+                          </Label>
+                          <div className="flex items-center">
+                            <Input
+                              name="option_image"
+                              value={questionData.options[i].option_image}
+                              onChange={(e) => handleInputChange(e, "option", i)}
+                            />
+                            <Button className="ml-2" onClick={() => document.getElementById(`optionImageInput${i}`)?.click()}>
+                              Upload
+                            </Button>
+                          </div>
+                          <input
+                            id={`optionImageInput${i}`}
+                            type="file"
+                            className="hidden"
+                            accept="image/*"
+                            onChange={(e) => handleImageUpload(e, "option", i)}
+                          />
+                        </div>
+                        <div>
+                          <Label>
+                            Option {questionData.options[i + 1].option_id} Image URL or Upload Image
+                          </Label>
+                          <div className="flex items-center">
+                            <Input
+                              name="option_image"
+                              value={questionData.options[i + 1].option_image}
+                              onChange={(e) => handleInputChange(e, "option", i + 1)}
+                            />
+                            <Button className="ml-2" onClick={() => document.getElementById(`optionImageInput${i + 1}`)?.click()}>
+                              Upload
+                            </Button>
+                          </div>
+                          <input
+                            id={`optionImageInput${i + 1}`}
+                            type="file"
+                            className="hidden"
+                            accept="image/*"
+                            onChange={(e) => handleImageUpload(e, "option", i + 1)}
+                          />
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
-                   
-              </div>
+                  ))}
+                </div>
+                {/* Options Block Input */}
+                <div className="mt-6 space-y-2">
+                  <Label>Paste Options Block</Label>
+                  <div className="flex space-x-3 ">
+
+                  <Textarea
+                    rows={6}
+                    placeholder={`(1) $\\frac{125 \\pi}{6}$\n(2) $\\frac{125 \\pi}{24}$\n(3) $\\frac{125 \\pi}{4}$\n(4) $\\frac{125 \\pi}{12}$`}
+                    value={optionsBlock}
+                    onChange={(e) => setOptionsBlock(e.target.value)}
+                    />
+                  <Button onClick={parseOptionsBlock}>Parse Options</Button>
+                    </div>
+                </div>
+              </>
             )}
 
             {/* Solution Section */}
@@ -309,12 +429,7 @@ export default function NewQuestionPage() {
                     onChange={(e) => handleInputChange(e, "solution")}
                   />
                 </div>
-                <Button
-                  className="ml-4"
-                  onClick={() =>
-                    document.getElementById("solutionImageInput")?.click()
-                  }
-                >
+                <Button className="ml-4" onClick={() => document.getElementById("solutionImageInput")?.click()}>
                   Upload
                 </Button>
                 <input
@@ -326,19 +441,16 @@ export default function NewQuestionPage() {
                 />
               </div>
             </div>
-            <div className="h-[40vh]">
-
-</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Right Side - Preview and Save */}
+      {/* Right Side - Preview and Next */}
       <div className="w-1/2 p-4 bg-gray-100 overflow-y-auto">
         <Card>
           <CardHeader className="flex items-center justify-between">
-            <CardTitle>Preview</CardTitle>
-            <Button onClick={saveData}>Save</Button>
+            <CardTitle className="hidden">Preview</CardTitle>
+            <Button onClick={saveData}>Next</Button>
           </CardHeader>
           <CardContent>
             <h3 className="text-lg font-semibold">Subject: {questionData.subject}</h3>
@@ -381,12 +493,13 @@ export default function NewQuestionPage() {
             )}
             <h3 className="text-lg font-semibold mt-4">Solution</h3>
             <p>
+              <strong>Answer:</strong> {questionData.solution.answer}
+            </p>
+            <p>
               <strong>Explanation:</strong>{" "}
               <Latex>{doubleDollarSigns(questionData.solution.explanation)}</Latex>
             </p>
-            <p>
-              <strong>Answer:</strong> {questionData.solution.answer}
-            </p>
+           
             {questionData.solution.solution_image && (
               <img
                 src={questionData.solution.solution_image}

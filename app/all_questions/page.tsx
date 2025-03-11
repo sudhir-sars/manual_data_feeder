@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Latex from "react-latex-next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import "katex/dist/katex.min.css";
 
 interface Option {
   _id: string;
@@ -69,12 +70,12 @@ export default function AllQuestionsPage() {
           </CardHeader>
           <CardContent>
             <div>
-              <Label>Subject:</Label> {question.subject}
+              <Label>Subject:  {question.subject}</Label>
             </div>
             <div>
-              <Label>Content:</Label>
+           
               <div>
-                <Latex>{doubleDollarSigns(question.content)}</Latex>
+                <Latex>{question.content}</Latex>
               </div>
             </div>
             {question.image && (
@@ -94,7 +95,7 @@ export default function AllQuestionsPage() {
                   {question.options.map((option) => (
                     <li key={option._id} className="mb-2">
                       <strong>{option.option_id}:</strong>{" "}
-                      <Latex>{doubleDollarSigns(option.content || "")}</Latex>
+                      <Latex>{option.content || ""}</Latex>
                       {option.option_image && (
                         <div className="mt-1">
                           <img
